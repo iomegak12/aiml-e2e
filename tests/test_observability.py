@@ -55,6 +55,13 @@ def test_metrics_endpoint(client: TestClient) -> None:
         assert name in response.text, name
 
 
+def test_known_label_series_start_at_zero(client: TestClient) -> None:
+    text = client.get("/metrics").text
+    assert 'loan_model_predictions_total{loan_purpose="Education",manual_review="true"}' in text
+    assert 'loan_api_validation_errors_total{field="requested_tenure_months"}' in text
+    assert 'loan_api_requests_total{endpoint="/predict/batch",method="POST",status_code="503"}' in text
+
+
 def test_metrics_requests_are_not_counted(client: TestClient) -> None:
     before = sample("loan_api_requests_total", method="GET", endpoint="/metrics", status_code="200")
     client.get("/metrics")

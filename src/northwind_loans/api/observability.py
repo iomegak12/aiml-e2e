@@ -135,6 +135,30 @@ MODEL_INFO = Gauge(
 
 REFERENCE_FEATURES: list[str] = ["annual_income", "credit_score", "predicted_offer"]
 
+# Label values created at 0 on start-up (see init_label_series)
+TRACKED_ROUTES: list[tuple[str, str]] = [
+    ("POST", "/predict"), ("POST", "/predict/batch"),
+    ("GET", "/health"), ("GET", "/ready"), ("GET", "/model-info"),
+]
+TRACKED_STATUS_CODES: list[str] = ["200", "422", "500", "503"]
+
+
+def init_label_series(loan_purposes: list[str], fields: list[str]) -> None:
+    """Create the known label combinations at 0.
+
+    A labelled counter only appears in /metrics after its first increment, so
+    Prometheus would see e.g. the first 422s as a series that *starts* at 5 and
+    rate() would report 0. Starting every known series at 0 avoids that.
+    """
+    for method, endpoint in TRACKED_ROUTES:
+        for status_code in TRACKED_STATUS_CODES:
+            REQUESTS_TOTAL.labels(method=method, endpoint=endpoint, status_code=status_code)
+    for purpose in loan_purposes:
+        for review in ("true", "false"):
+            PREDICTIONS_TOTAL.labels(loan_purpose=purpose, manual_review=review)
+    for field in fields:
+        VALIDATION_ERRORS.labels(field=field)
+
 
 def set_model_gauges(metadata: dict) -> None:
     """Set the reference means and model info once at start-up."""

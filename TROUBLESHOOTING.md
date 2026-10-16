@@ -66,6 +66,39 @@ retry (or poll `/ready`).
 Prefix the command with `MSYS_NO_PATHCONV=1`, e.g.
 `MSYS_NO_PATHCONV=1 docker exec loan-api ls /app/models`.
 
+### `curl -X POST localhost:9090/-/reload` is refused
+Prometheus needs `--web.enable-lifecycle` (set in docker-compose.yml). After changing the
+compose `command`, run `docker compose up -d prometheus` (a reload is not enough).
+
+### Grafana rejects the password from `.env`
+`GRAFANA_ADMIN_PASSWORD` is applied only when Grafana creates its database. For an existing
+`grafana-data` volume: `docker compose exec grafana grafana cli admin reset-admin-password <new>`.
+
+### Dashboard panel says "No data" right after traffic
+`rate(...[1m])` needs at least two scrapes of a series (scrape interval is 5 s) — wait
+~15 s. Counters with labels that never occurred (e.g. no 5xx yet) have no series; the error
+panels use `or vector(0)` for that reason.
+
+### Rates show 0 for the first errors after a restart
+A labelled counter that first appears at 5 looks like "no change" to `rate()`. The API
+creates its known label combinations at 0 on start-up; brand-new label values (an unknown
+field name) only count from their second occurrence.
+
+### `PermissionError ... pytest-of-<user>\pytest-current` on Windows
+pytest could not replace its temp link. The project uses `--basetemp=.pytest_tmp`
+(pyproject.toml) to avoid it; delete the stale folder in `%TEMP%` manually if you like.
+
 ### Settings in `.env` are ignored
 `.env` must be in the project root (next to `pyproject.toml`). Variables already set
 in your shell take precedence over `.env`.
+
+### `make monitor` ends with `make: *** [Makefile] Error 1`
+Expected when at least one feature has PSI > 0.25 ("investigate") - the exit code is meant to
+fail a scheduled job. Read the verdict in `reports/monitoring_report.md`.
+
+### `make monitor` reports NO DATA
+No predictions in the last 30 minutes of `logs/predictions.jsonl`. Run a simulator first, or
+call `python -m northwind_loans.monitoring` without `--since-minutes` for the whole log.
+
+### Fairness tables say "skipped (< 30)" / "not enough data"
+Groups with fewer than 30 records are left out (too noisy). Run the simulator longer.

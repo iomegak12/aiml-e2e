@@ -36,6 +36,8 @@ where = ["src"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+# project-local temp dir: avoids Windows permission errors on %TEMP%\pytest-of-<user>\pytest-current
+addopts = "--basetemp=.pytest_tmp"
 filterwarnings = [
     "error",  # treat every warning as a test failure ...
     # ... except this third-party one: starlette 0.41.3 (pinned via fastapi) uses an

@@ -16,6 +16,7 @@ import uuid
 from collections.abc import AsyncIterator, Awaitable, Callable
 from contextlib import asynccontextmanager
 from pathlib import Path
+from typing import get_args
 
 from fastapi import FastAPI, HTTPException, Request, Response
 from fastapi.exception_handlers import request_validation_exception_handler
@@ -89,6 +90,10 @@ def create_app(model_dir: Path = MODEL_DIR, prediction_log: Path = PREDICTION_LO
         title, version = "Northwind Loan Offer API - no model", "0"
 
     app = FastAPI(title=title, version=version, description=DESCRIPTION, lifespan=lifespan)
+    obs.init_label_series(
+        loan_purposes=list(get_args(ApplicantIn.model_fields["loan_purpose"].annotation)),
+        fields=list(ApplicantIn.model_fields),
+    )
     app.state.model_dir = model_dir
     app.state.prediction_log = prediction_log
     app.state.predictor = None

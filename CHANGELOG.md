@@ -68,7 +68,36 @@ versions follow [Semantic Versioning](https://semver.org/).
   `down`, `logs`.
 - Uvicorn's `color_message` extra is dropped from JSON logs.
 
+- Grafana dashboard `monitoring/grafana/dashboards/loan_api.json` (uid `loan-api`, 3 rows,
+  13 panels, refresh 5 s) with file provisioning; Prometheus alert rules
+  `monitoring/prometheus/alerts.yml` (group `loan-api`, 5 alerts with summary/description).
+- `scripts/check_monitoring.py` / `make check-dashboards`: runs every panel query and alert
+  signal against Prometheus. `tests/test_dashboard.py`.
+- Known metric label combinations are created at 0 on start-up so `rate()`/`increase()`
+  see the first 422s, manual reviews and validation errors.
+
+- `scripts/simulate_traffic.py`: traffic simulator (`--mode normal|drift|bad|mixed`,
+  `--rps`, `--duration`, `--seed` = 51, `--data`), paced loop, 5 s timeout, never crashes,
+  progress every 10 s and a final summary. Make targets `simulate-normal` (120 s),
+  `simulate-drift` (300 s), `simulate-bad` (120 s), `reset-logs`.
+
+- `northwind_loans.monitoring`: offline report from `logs/predictions.jsonl` vs the latest
+  model's reference profile - PSI drift (stored decile edges, epsilon 1e-6; stable / watch /
+  investigate) for income, credit score, EMI, tenure, DTI and offered amount, loan_purpose
+  shares, fairness screening by gender and age band (offer/income and manual-review rate,
+  lowest/highest ratio < 0.80 -> review, groups < 30 skipped; gender/age joined by
+  `application_id`), volumes. Writes `reports/monitoring_report.md` + `.json`; exit code 1
+  on "investigate". `make monitor`.
+- `docs/architecture.md`; README completed (quick start, URLs, business rules, responsible use,
+  troubleshooting).
+
 ### Changed
+- `make monitor` now runs the monitoring report; the Prometheus/Grafana query check moved to
+  `make check-dashboards`.
+- Prometheus: scrape/evaluation every 5 s, `--web.enable-lifecycle` (POST `/-/reload`),
+  config directory mounted read-only. Grafana mounts the dashboards folder.
+- 4xx/5xx error-rate numerators use `or vector(0)`; `manual_review` label is `"true"`.
+- pytest uses a project-local `--basetemp=.pytest_tmp`.
 - pytest treats warnings as errors (`filterwarnings = ["error", ...]`), ignoring one
   third-party starlette/anyio deprecation.
 - Missing or invalid income now gives **no offer** (NaN / None) instead of 0; rule count

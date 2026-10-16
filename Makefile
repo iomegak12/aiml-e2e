@@ -18,7 +18,7 @@ MODEL_VERSION = $(shell $(PY) -c "from northwind_loans.registry import list_vers
 
 # "logs" is also a folder name, so every target must be .PHONY
 .PHONY: help setup profile clean-data features train models predict-sample test serve \
-        docker-build up down logs simulate-normal simulate-drift simulate-bad monitor
+        docker-build up down logs simulate-normal simulate-drift simulate-bad reset-logs monitor check-dashboards
 
 help:
 	@echo "Northwind Finance - make targets"
@@ -34,10 +34,12 @@ help:
 	@echo "  docker-build     build the API Docker image"
 	@echo "  up / down        start / stop the Docker stack"
 	@echo "  logs             follow the stack logs"
-	@echo "  simulate-normal  send normal traffic to the API"
-	@echo "  simulate-drift   send drifted traffic to the API"
-	@echo "  simulate-bad     send invalid traffic to the API"
-	@echo "  monitor          open Prometheus / Grafana"
+	@echo "  simulate-normal  normal traffic, 5 rps for 120 s"
+	@echo "  simulate-drift   downturn traffic (income x0.6, score -80, 50% Personal), 300 s"
+	@echo "  simulate-bad     30% invalid requests, 120 s"
+	@echo "  reset-logs       truncate logs/predictions.jsonl to 0 bytes"
+	@echo "  monitor          drift + fairness report from the audit log (last 30 min, exit 1 = investigate)"
+	@echo "  check-dashboards print dashboard URLs and run every panel/alert query"
 
 # ---- Available now ---------------------------------------------------------
 setup:
@@ -80,15 +82,26 @@ down:
 logs:
 	docker compose logs -f api
 
-# ---- Placeholders: implemented in later steps --------------------------------
+SIM := $(PY) scripts/simulate_traffic.py
+
 simulate-normal:
-	@echo "simulate-normal: not implemented yet (coming in a later step)"
+	$(SIM) --mode normal --duration 120
 
 simulate-drift:
-	@echo "simulate-drift: not implemented yet (coming in a later step)"
+	$(SIM) --mode drift --duration 300
 
 simulate-bad:
-	@echo "simulate-bad: not implemented yet (coming in a later step)"
+	$(SIM) --mode bad --duration 120
 
+# Truncate the audit log to 0 bytes (never deletes it; the API keeps appending)
+reset-logs:
+	$(PY) -c "from northwind_loans.config import PREDICTION_LOG as p; p.parent.mkdir(exist_ok=True); open(p, 'w').close(); print(f'{p} truncated to {p.stat().st_size} bytes')"
+
+# Drift + fairness report; exits 1 (make shows "Error 1") when a feature needs investigation
 monitor:
-	@echo "monitor: not implemented yet (coming in a later step)"
+	$(PY) -m northwind_loans.monitoring --since-minutes 30 --output reports/monitoring_report
+
+check-dashboards:
+	@echo "Grafana    : http://localhost:3000/d/loan-api/northwind-loan-offer-api"
+	@echo "Prometheus : http://localhost:9090/alerts"
+	$(PY) scripts/check_monitoring.py

@@ -1,7 +1,11 @@
-# Prometheus scrape config for the Northwind loan API (docker compose network).
+# Prometheus config for the Northwind loan API (docker compose network).
+# 5s matches the Grafana dashboard refresh and gives rate(...[1m]) ~12 samples.
 global:
-  scrape_interval: 15s
-  evaluation_interval: 15s
+  scrape_interval: 5s
+  evaluation_interval: 5s
+
+rule_files:
+  - alerts.yml
 
 scrape_configs:
   - job_name: loan-api
